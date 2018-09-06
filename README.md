@@ -1,13 +1,14 @@
-# Get-HostData
+## Get-HostData
  This function will bring back a single object of a number of host command-lets.
  
-.DESCRIPTION 
-     This function gets processes, services, BIOs info, networking info, and basic computer info.  The function can run against local or remote machines. 
+# DESCRIPTION 
+     This function gets processes, services, BIOs info, networking info, and basic computer info.  The function can run against local or remote machines. It also hashs all processes, and provides process names to networking info.
  
-.PARAMETER  N/A 
+# PARAMETER  N/A 
     None at this time
  
-.EXAMPLE 
+# EXAMPLE 
+
     PS C:\>$hostdata = Get-GetHostData
     PS C:\>$hostdata  
          
