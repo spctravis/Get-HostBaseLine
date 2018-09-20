@@ -61,7 +61,7 @@ $BiosInfoList = New-Object System.Collections.Generic.List[System.Object]
         NetAdapter = Get-NetAdapter
         LogicalDisks = (Get-CimInstance -ClassName Win32_LogicalDisk)
         SMBShares = Get-SmbShare
-        USBHistory = Get-ItemProperty HKLM:\SYSTEM\CurrentControlSet\Enum\USBSTOR\*\* | select friendlyname, serial
+        USBHistory = Get-ItemProperty HKLM:\SYSTEM\CurrentControlSet\Enum\USBSTOR\*\* -ErrorAction SilentlyContinue | select friendlyname, serial
         # Drivers = Get-WindowsDriver -online -all -ErrorAction SilentlyContinue
         ActiveUsers =  (Get-CimInstance Win32_LoggedOnUser -ComputerName $ComputerName).antecedent.name | Select-Object -Unique
         NetworkInfo = Get-NetIPConfiguration
@@ -72,7 +72,12 @@ $BiosInfoList = New-Object System.Collections.Generic.List[System.Object]
         InstalledPrograms =  Get-WmiObject -class win32_product | select Name,Version,InstallDate,InstallDate2,InstallLocation,InstallSource,Path,Vendor -ErrorAction SilentlyContinue
         DateTimeRan = (Get-Date).ToString("yyyyMMddThhmmssmsmsZ")
                }
-    $InfoObject = New-Object -TypeName PSCustomObject -Property $props
+           #Takes out nulls from props
+           $notnullarray = $props.GetEnumerator() | where value -ne $null
+           $notnullhash = @{}
+           $notnullarray | foreach { $notnullhash[$_.Key] = $_.Value }
+   
+    $InfoObject = New-Object -TypeName PSCustomObject -Property $notnullhash
     $InfoList.add($InfoObject)
 
 #------------------Iterate Through Each Commandlet------------#
@@ -83,7 +88,11 @@ Foreach ($Service in Get-Service) {
         Status = $Service.Status
         StartType = $Service.StartType
                }
-    $ServiceObject = New-Object -TypeName PSCustomObject -Property $props
+           #Takes out nulls from props
+           $notnullarray = $props.GetEnumerator() | where value -ne $null
+           $notnullhash = @{}
+           $notnullarray | foreach { $notnullhash[$_.Key] = $_.Value }
+    $ServiceObject = New-Object -TypeName PSCustomObject -Property $notnullhash
     $ServiceList.add($ServiceObject)
      } # End Service Foreach
 
@@ -102,7 +111,11 @@ Foreach ($Process in $getprocess) {
         ProcessHash = $Hash.hash
         HashAlgorithm = $Hash.Algorithm
                } 
-    $ProcessObject = New-Object -TypeName PSCustomObject -Property $props -ErrorAction SilentlyContinue
+           #Takes out nulls from props
+           $notnullarray = $props.GetEnumerator() | where value -ne $null
+           $notnullhash = @{}
+           $notnullarray | foreach { $notnullhash[$_.Key] = $_.Value }
+    $ProcessObject = New-Object -TypeName PSCustomObject -Property $notnullhash
     $ProcessList.add($ProcessObject)
     }  # End Process Foreach
 
@@ -116,7 +129,11 @@ Foreach ($Process in $getprocess) {
         RemoteAddress = $NetConnection.RemoteAddress
         RemotePort = $NetConnection.RemotePort
                }
-    $NetConnectionObject = New-Object -TypeName PSCustomObject -Property $props
+           #Takes out nulls from props
+           $notnullarray = $props.GetEnumerator() | where value -ne $null
+           $notnullhash = @{}
+           $notnullarray | foreach { $notnullhash[$_.Key] = $_.Value }
+    $NetConnectionObject = New-Object -TypeName PSCustomObject -Property $notnullhash
     $TCPNetConnectionList.add($NetConnectionObject)
      } # End NetConnection Foreach
 
@@ -127,7 +144,11 @@ Foreach ($Process in $getprocess) {
         OwningProcess = $NetConnection.OwningProcess
         OwningProcessName = (Get-Process -ID $NetConnection.OwningProcess).Name
                }
-    $NetConnectionObject = New-Object -TypeName PSCustomObject -Property $props
+           #Takes out nulls from props
+           $notnullarray = $props.GetEnumerator() | where value -ne $null
+           $notnullhash = @{}
+           $notnullarray | foreach { $notnullhash[$_.Key] = $_.Value }
+    $NetConnectionObject = New-Object -TypeName PSCustomObject -Property $notnullhash
     $UDPNetConnectionList.add($NetConnectionObject)
      } # End NetConnection Foreach
 
@@ -138,7 +159,11 @@ $BiosInfo = Get-CimInstance -ClassName Win32_BIOS
         SerialNumber = $BiosInfo.SerialNumber
         Version = $BiosInfo.Version
                }
-    $BiosInfoObject = New-Object -TypeName PSCustomObject -Property $props
+           #Takes out nulls from props
+           $notnullarray = $props.GetEnumerator() | where value -ne $null
+           $notnullhash = @{}
+           $notnullarray | foreach { $notnullhash[$_.Key] = $_.Value }
+    $BiosInfoObject = New-Object -TypeName PSCustomObject -Property $notnullhash
     $BiosInfoList.add($BiosInfoObject)
 
 #------------------Add Object Properties-----------------------#
