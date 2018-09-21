@@ -1,4 +1,4 @@
-﻿Function Get-HostData 
+Function Get-HostData 
 { 
 <# 
 .SYNOPSIS 
@@ -19,9 +19,7 @@ Services : All services
 Processes  :  All Processes
 NetConnections : All Network Connections
 BIOsInfo : All BIOs Data
-
     PS C:\>$hostdata.Processes.Name
-
 AGSService
 ApplicationFrameHost
 audiodg
@@ -30,8 +28,9 @@ Calculator
                                      
    
 .Notes 
-LastModified: 9/5/2018 
+LastModified: 9/21/2018 
 Author:       Travis Anderson 
+              Richard Hailey (Get-Netstat)
  
      
 #> 
@@ -118,39 +117,124 @@ Foreach ($Process in $getprocess) {
     $ProcessObject = New-Object -TypeName PSCustomObject -Property $notnullhash
     $ProcessList.add($ProcessObject)
     }  # End Process Foreach
+function Get-Netstat 
+{              
+<# 
+.SYNOPSIS 
+    This function uses the netstat command to get networking info. 
+ 
+.DESCRIPTION 
+     This function uses nestat -ano and uses REGEX to make the info objects.  The function can run against local or remote machines. 
+ 
+.PARAMETER  N/A 
+    None at this time
+ 
+.EXAMPLE 
+    PS C:\>$netstat = Get-Netstat
+    PS C:\>$netstat  
+         
+Protocol          : TCP
+LocalAddress      : [::]
+LocalPort         : 49668
+RemoteAddress     : [::]
+RemotePort        : 0
+State             : LISTENING
+OwningProcess     : 888
+ComputerName      : JEGWL-COS013
+ProcessName       : lsass.exe
+ParentProcessID   : 724
+ParentProcessName : wininit.exe
+                                     
+   
+.Notes 
+LastModified: 9/21/2018 
+Author:       Richard Hailey
 
- Foreach ($NetConnection in Get-NetTCPConnection) { 
-     $props = @{
-        State = $NetConnection.State
-        LocalAddress = $NetConnection.LocalAddress
-        LocalPort = $NetConnection.LocalPort
-        OwningProcess = $NetConnection.OwningProcess
-        OwningProcessName = (Get-Process -ID $NetConnection.OwningProcess).Name
-        RemoteAddress = $NetConnection.RemoteAddress
-        RemotePort = $NetConnection.RemotePort
-               }
-           #Takes out nulls from props
-           $notnullarray = $props.GetEnumerator() | where value -ne $null
-           $notnullhash = @{}
-           $notnullarray | foreach { $notnullhash[$_.Key] = $_.Value }
-    $NetConnectionObject = New-Object -TypeName PSCustomObject -Property $notnullhash
-    $TCPNetConnectionList.add($NetConnectionObject)
-     } # End NetConnection Foreach
+Modified By:  Travis Anderson
+ 
+     
+#>
 
- Foreach ($NetConnection in Get-NetUDPEndpoint) { 
-     $props = @{
-        LocalAddress = $NetConnection.LocalAddress
-        LocalPort = $NetConnection.LocalPort
-        OwningProcess = $NetConnection.OwningProcess
-        OwningProcessName = (Get-Process -ID $NetConnection.OwningProcess).Name
-               }
-           #Takes out nulls from props
-           $notnullarray = $props.GetEnumerator() | where value -ne $null
-           $notnullhash = @{}
-           $notnullarray | foreach { $notnullhash[$_.Key] = $_.Value }
-    $NetConnectionObject = New-Object -TypeName PSCustomObject -Property $notnullhash
-    $UDPNetConnectionList.add($NetConnectionObject)
-     } # End NetConnection Foreach
+    $Netstat = & netstat -ano #Runs the Netstat command
+    $Netstat = $Netstat[4..($Netstat.Length - 1)] #Removes the Header Info
+    $ProcessList = Get-WmiObject -Class Win32_Process #Gets Processes
+
+#------------------REGEX the TCP and UDP Connections----------#
+    [regex]$TCP = '(?<Protocol>\S+)\s+(?<LAddress>\S+):(?<LPort>\S+)\s+(?<RAddress>\S+):(?<RPort>\S+)\s+(?<State>\S+)\s+(?<PID>\S+)'
+    [regex]$UDP = '(?<Protocol>\S+)\s+(?<LAddress>\S+):(?<LPort>\S+)\s+(?<RAddress>\S+):(?<RPort>\S+)\s+(?<PID>\S+)'
+#------------------Set up List and start Foreach Object Def---#
+    $Return = New-Object 'System.Collections.Generic.List[System.Object]'
+
+    foreach($Line in $Netstat)
+    {
+        $Obj = New-Object PSCustomObject
+        switch -Regex ($Line.Trim())
+        {
+            $TCP
+            {
+                $Obj | Add-Member -MemberType NoteProperty -Name Protocol      -Value $Matches.Protocol
+                $Obj | Add-Member -MemberType NoteProperty -Name LocalAddress  -Value $Matches.LAddress
+                $Obj | Add-Member -MemberType NoteProperty -Name LocalPort     -Value $Matches.LPort
+                $Obj | Add-Member -MemberType NoteProperty -Name RemoteAddress -Value $Matches.RAddress
+                $Obj | Add-Member -MemberType NoteProperty -Name RemotePort    -Value $Matches.RPort
+                $Obj | Add-Member -MemberType NoteProperty -Name State         -Value $Matches.State
+                $Obj | Add-Member -MemberType NoteProperty -Name OwningProcess -Value $Matches.PID
+                $Obj | Add-Member -MemberType NoteProperty -Name ComputerName  -Value $env:COMPUTERNAME
+                foreach($I in $ProcessList)
+                    {
+                    if ($Obj.owningprocess -eq $I.ProcessId)
+                        {
+                            $Obj | Add-Member -MemberType NoteProperty -Name ProcessName -Value $I.Name
+                            $Obj | Add-Member -MemberType NoteProperty -Name ParentProcessID -Value $I.ParentProcessID
+                                foreach($B in $ProcessList)
+                                    {
+                                    if ($I.ParentProcessId -eq $B.ProcessId)
+                                        {
+                                        $Obj | Add-Member -MemberType NoteProperty -Name ParentProcessName -Value $B.Name
+                                        }
+                                        continue
+                                   } #End Foreach on Parent Process Name 
+                            continue
+                        }
+                    } #End Foreach For Adding Values to TCP                
+                continue
+            } #End TCP Values
+            
+            $UDP
+            {
+                $Obj | Add-Member -MemberType NoteProperty -Name Protocol      -Value $Matches.Protocol
+                $Obj | Add-Member -MemberType NoteProperty -Name LocalAddress  -Value $Matches.LAddress
+                $Obj | Add-Member -MemberType NoteProperty -Name LocalPort     -Value $Matches.LPort
+                $Obj | Add-Member -MemberType NoteProperty -Name RemoteAddress -Value $Matches.RAddress
+                $Obj | Add-Member -MemberType NoteProperty -Name RemotePort    -Value $Matches.RPort
+                $Obj | Add-Member -MemberType NoteProperty -Name State         -Value $Matches.State
+                $Obj | Add-Member -MemberType NoteProperty -Name OwningProcess -Value $Matches.PID
+                $Obj | Add-Member -MemberType NoteProperty -Name ComputerName  -Value $env:COMPUTERNAME
+                foreach($I in $ProcessList)
+                    {
+                    if ($Obj.owningprocess -eq $I.ProcessId)
+                        {
+                            $Obj | Add-Member -MemberType NoteProperty -Name ProcessName -Value $I.Name
+                            $Obj | Add-Member -MemberType NoteProperty -Name ParentProcessID -Value $I.ParentProcessID
+                                 foreach($B in $ProcessList)
+                                    {
+                                    if ($I.ParentProcessId -eq $B.ProcessId)
+                                        {
+                                        $Obj | Add-Member -MemberType NoteProperty -Name ParentProcessName -Value $B.Name
+                                        }
+                                        continue
+                                     }#End Foreach on Parent Process Name
+                            continue
+                        }
+                    }#End Foreach For Adding Values to UDP
+                continue
+            } #End UDP Values
+        }
+        $Return.Add($Obj)
+    }
+    return $Return
+} #End Get-NetStat function
+$netstat = Get-Netstat
 
 $BiosInfo = Get-CimInstance -ClassName Win32_BIOS
     $props = @{
@@ -171,8 +255,7 @@ $hostdata = New-Object -TypeName pscustomobject
         $hostdata | Add-Member -name ComputerInfo -MemberType NoteProperty -Value $InfoList
         $hostdata | Add-Member -Name Services -MemberType NoteProperty -Value $ServiceList
         $hostdata | Add-Member -Name Processes -MemberType NoteProperty -Value $ProcessList
-        $hostdata | Add-Member -Name TCPNetConnections -MemberType NoteProperty -Value $TCPNetConnectionList
-        $hostdata | Add-Member -Name UDPNetConnections -MemberType NoteProperty -Value $UDPNetConnectionList
+        $hostdata | Add-Member -Name Netstat -MemberType NoteProperty -Value $netstat
         $hostdata | Add-Member -Name BIOsInfo -MemberType NoteProperty -Value $BiosInfoList
 return $hostdata
 } # End of Function Get-HostData 
