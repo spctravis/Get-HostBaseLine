@@ -1,4 +1,4 @@
-## Get-HostData
+## Get-HostBaseLine
  This function will bring back a single object of a number of host command-lets.
  
 # DESCRIPTION 
@@ -9,7 +9,7 @@
  
 # EXAMPLE 
 
-    PS C:\>$hostdata = Get-GetHostData
+    PS C:\>$hostdata = Get-GetHostBaseLine
     PS C:\>$hostdata  
          
 ComputerInfo : Netadaptor, Computername, etc
