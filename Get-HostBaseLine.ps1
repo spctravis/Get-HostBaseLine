@@ -1,4 +1,4 @@
-Function Get-HostData 
+Function Get-HostBaseLine
 { 
 <# 
 .SYNOPSIS 
@@ -11,7 +11,7 @@ Function Get-HostData
     None at this time
  
 .EXAMPLE 
-    PS C:\>$hostdata = Get-GetHostData
+    PS C:\>$hostdata = Get-GetHostBaseLine
     PS C:\>$hostdata  
          
 ComputerInfo : Netadaptor, Computername, etc
@@ -258,4 +258,4 @@ $hostdata = New-Object -TypeName pscustomobject
         $hostdata | Add-Member -Name Netstat -MemberType NoteProperty -Value $netstat
         $hostdata | Add-Member -Name BIOsInfo -MemberType NoteProperty -Value $BiosInfoList
 return $hostdata
-} # End of Function Get-HostData 
+} # End of Function Get-HostBaseLine
