@@ -17,6 +17,7 @@ $hosts | ForEach-Object { if ($opensessions.computername -notcontains $_)
                 $opensessions | where state -eq Disconnected | Remove-PSSession
                            }
                         } # End foreach
+return $cred #allows you not to keep entering your creds
 $checksession = Get-PSSession
 $hosts | ForEach-Object { if ($checksession.computername -notcontains $_)
         {

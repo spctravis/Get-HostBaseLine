@@ -76,7 +76,7 @@ $BiosInfoList =         New-Object System.Collections.Generic.List[System.Object
         HotFix = (Get-HotFix).HotFixID
         Domain = (Get-WmiObject -Class Win32_ComputerSystem).Domain
         PSVersion = $PSVersionTable
-        #NetAdapter = Get-NetAdapter
+        NetAdapter = Get-WmiObject -Class win32_networkadapter
         LogicalDisks = (Get-WmiObject -Class Win32_LogicalDisk)
         #SMBShares = Get-SmbShare
         USBHistory = Get-ItemProperty HKLM:\SYSTEM\CurrentControlSet\Enum\USBSTOR\*\* -ErrorAction SilentlyContinue | select friendlyname, serial
@@ -124,7 +124,7 @@ Foreach ($Process in $getprocess) {
         Company = $Process.Company
         Product = $Process.Product
         Modules = $Process.Modules
-        StartTime = $Process.CreationDate.convertToDateTime()
+        StartTime = $Process.CreationDate 
         Commandline = $Process.CommandLine
         ProcessHash = $Hash.hash
         HashAlgorithm = $Hash.Algorithm
