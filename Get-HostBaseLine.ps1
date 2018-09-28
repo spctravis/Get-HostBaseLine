@@ -35,6 +35,7 @@ Author:       Travis Anderson
      
 #> 
 #------------------Set Each List to Null----------------------#
+$HostKey = $null
 $hostdata = $null
 $InfoList = $null
 $ServiceList = $null
@@ -43,33 +44,50 @@ $TCPNetConnectionList = $null
 $UDPNetConnectionList = $null
 $BiosInfoList = $null
 #------------------Declare Each List--------------------------#
-$InfoList = New-Object System.Collections.Generic.List[System.Object]
-$ServiceList = New-Object System.Collections.Generic.List[System.Object]
-$ProcessList = New-Object System.Collections.Generic.List[System.Object]
+$HostKeyList =          New-Object System.Collections.Generic.List[System.Object]
+$InfoList =             New-Object System.Collections.Generic.List[System.Object]
+$ServiceList =          New-Object System.Collections.Generic.List[System.Object]
+$ProcessList =          New-Object System.Collections.Generic.List[System.Object]
 $TCPNetConnectionList = New-Object System.Collections.Generic.List[System.Object]
 $UDPNetConnectionList = New-Object System.Collections.Generic.List[System.Object]
-$BiosInfoList = New-Object System.Collections.Generic.List[System.Object]
+$BiosInfoList =         New-Object System.Collections.Generic.List[System.Object]
+#------------------Tracking Key-------------------------------#
+    $props = $null
+    $props = @{}
+    $props = @{
+        HostFQDN = Get-WmiObject Win32_ComputerSystem -Property 'Name','Domain' | ForEach-Object {"$($_.Name).$($_.Domain)"}
+        DateTimeRan = (Get-Date).ToString("yyyyMMddThhmmssmsmsZ")
+                       }
+           #Takes out nulls from props
+           $notnullarray = $props.GetEnumerator() | where value -ne $null
+           $notnullhash = @{}
+           $notnullarray | foreach { $notnullhash[$_.Key] = $_.Value }
+   
+    $InfoObject = New-Object -TypeName PSCustomObject -Property $notnullhash
+    $HostKeyList.add($InfoObject)
+
+
 #------------------Basic Computer Info------------------------#
-    
+    $props = $null
+    $props = @{}    
     $props = @{
         ComputerName = $env:COMPUTERNAME
         OperatingSystem = (Get-WmiObject -Class win32_OperatingSystem).Version
         HotFix = (Get-HotFix).HotFixID
-        Domain = (Get-CimInstance -ClassName Win32_ComputerSystem).Domain
+        Domain = (Get-WmiObject -Class Win32_ComputerSystem).Domain
         PSVersion = $PSVersionTable
-        NetAdapter = Get-NetAdapter
-        LogicalDisks = (Get-CimInstance -ClassName Win32_LogicalDisk)
-        SMBShares = Get-SmbShare
+        #NetAdapter = Get-NetAdapter
+        LogicalDisks = (Get-WmiObject -Class Win32_LogicalDisk)
+        #SMBShares = Get-SmbShare
         USBHistory = Get-ItemProperty HKLM:\SYSTEM\CurrentControlSet\Enum\USBSTOR\*\* -ErrorAction SilentlyContinue | select friendlyname, serial
         # Drivers = Get-WindowsDriver -online -all -ErrorAction SilentlyContinue
-        ActiveUsers =  (Get-CimInstance Win32_LoggedOnUser -ComputerName $ComputerName).antecedent.name | Select-Object -Unique
+        ActiveUsers =  (Get-WmiObject Win32_LoggedOnUser -ComputerName $env:COMPUTERNAME).antecedent.name | Select-Object -Unique
         NetworkInfo = Get-NetIPConfiguration
         Route = Get-NetRoute
         ScheduledTasks = Get-ScheduledTask
         AntiVirus = (Get-WmiObject -Namespace "root\SecurityCenter2" -query "SELECT * FROM AntiVirusProduct").displayname
         SDCVersion = (Get-ItemProperty HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\OEMInformation).model
         InstalledPrograms =  Get-WmiObject -class win32_product | select Name,Version,InstallDate,InstallDate2,InstallLocation,InstallSource,Path,Vendor -ErrorAction SilentlyContinue
-        DateTimeRan = (Get-Date).ToString("yyyyMMddThhmmssmsmsZ")
                }
            #Takes out nulls from props
            $notnullarray = $props.GetEnumerator() | where value -ne $null
@@ -94,23 +112,24 @@ Foreach ($Service in Get-Service) {
     $ServiceObject = New-Object -TypeName PSCustomObject -Property $notnullhash
     $ServiceList.add($ServiceObject)
      } # End Service Foreach
-
-$getprocess = Get-Process
+$getmodule = Get-WmiObject -Class cim_processexecutable -Namespace root\cimv2
+$getprocess = Get-WmiObject Win32_Process
 Foreach ($Process in $getprocess) {
-    if($process.path){
-    $hash = Get-FileHash -Path $Process.Path -Algorithm SHA1 -ErrorAction SilentlyContinue}
+    if($process.ExecutablePath){
+    $hash = Get-FileHash -Path $Process.ExecutablePath -Algorithm SHA1 -ErrorAction SilentlyContinue}
     $props = @{
         Name = $Process.ProcessName
-        PID = $Process.Id
-        Path = $Process.Path
+        PID = $Process.ProcessId
+        Path = $Process.ExecutablePath
         Company = $Process.Company
         Product = $Process.Product
         Modules = $Process.Modules
-        StartTime = $Process.StartTime
+        StartTime = $Process.CreationDate.convertToDateTime()
+        Commandline = $Process.CommandLine
         ProcessHash = $Hash.hash
         HashAlgorithm = $Hash.Algorithm
                } 
-           #Takes out nulls from props
+           #Takes out nulls $from props
            $notnullarray = $props.GetEnumerator() | where value -ne $null
            $notnullhash = @{}
            $notnullarray | foreach { $notnullhash[$_.Key] = $_.Value }
@@ -157,7 +176,7 @@ Modified By:  Travis Anderson
 
     $Netstat = & netstat -ano #Runs the Netstat command
     $Netstat = $Netstat[4..($Netstat.Length - 1)] #Removes the Header Info
-    $ProcessList = Get-WmiObject -Class Win32_Process #Gets Processes
+    $ProcessList = $getprocess #Gets Processes
 
 #------------------REGEX the TCP and UDP Connections----------#
     [regex]$TCP = '(?<Protocol>\S+)\s+(?<LAddress>\S+):(?<LPort>\S+)\s+(?<RAddress>\S+):(?<RPort>\S+)\s+(?<State>\S+)\s+(?<PID>\S+)'
@@ -236,7 +255,7 @@ Modified By:  Travis Anderson
 } #End Get-NetStat function
 $netstat = Get-Netstat
 
-$BiosInfo = Get-CimInstance -ClassName Win32_BIOS
+$BiosInfo = Get-WmiObject -Class Win32_BIOS
     $props = @{
         Name = $BiosInfo.SMBIOSBIOSVersion
         Manufacturer = $BiosInfo.Manufacturer
@@ -252,6 +271,7 @@ $BiosInfo = Get-CimInstance -ClassName Win32_BIOS
 
 #------------------Add Object Properties-----------------------#
 $hostdata = New-Object -TypeName pscustomobject 
+        $hostdata | Add-Member -Name HostKey -MemberType NoteProperty -Value $HostKeyList
         $hostdata | Add-Member -name ComputerInfo -MemberType NoteProperty -Value $InfoList
         $hostdata | Add-Member -Name Services -MemberType NoteProperty -Value $ServiceList
         $hostdata | Add-Member -Name Processes -MemberType NoteProperty -Value $ProcessList
