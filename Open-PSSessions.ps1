@@ -1,4 +1,4 @@
-﻿$hostfile = "C:\Users\Twitchy\Documents\WorkingDir\Hosts.txt"
+$hostfile = "C:\Users\Twitchy\Documents\WorkingDir\Hosts.txt"
 if (!$cred) { # checks if credentials need to be obtained
 $cred = Get-Credential 
             } # end looking for $cred 
