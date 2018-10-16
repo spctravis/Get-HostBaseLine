@@ -40,17 +40,15 @@ $hostdata = $null
 $InfoList = $null
 $ServiceList = $null
 $ProcessList = $null
-$TCPNetConnectionList = $null
-$UDPNetConnectionList = $null
+$netstat = $null
 $BiosInfoList = $null
 #------------------Declare Each List--------------------------#
 $HostKeyList =          New-Object System.Collections.Generic.List[System.Object]
 $InfoList =             New-Object System.Collections.Generic.List[System.Object]
 $ServiceList =          New-Object System.Collections.Generic.List[System.Object]
 $ProcessList =          New-Object System.Collections.Generic.List[System.Object]
-$TCPNetConnectionList = New-Object System.Collections.Generic.List[System.Object]
-$UDPNetConnectionList = New-Object System.Collections.Generic.List[System.Object]
 $BiosInfoList =         New-Object System.Collections.Generic.List[System.Object]
+$NetworkList =          New-Object System.Collections.Generic.List[System.Object]
 #------------------Tracking Key-------------------------------#
     $props = $null
     $props = @{}
@@ -73,22 +71,17 @@ $BiosInfoList =         New-Object System.Collections.Generic.List[System.Object
     $props = @{
         ComputerName = $env:COMPUTERNAME
         OperatingSystem = (Get-WmiObject -Class win32_OperatingSystem).Version
-        HotFix = (Get-HotFix).HotFixID
-        Domain = (Get-WmiObject -Class Win32_ComputerSystem).Domain
-        PSVersion = $PSVersionTable
-        NetAdapter = Get-WmiObject -Class win32_networkadapter
-        LogicalDisks = (Get-WmiObject -Class Win32_LogicalDisk)
-        #SMBShares = Get-SmbShare
+        HotFix = (Get-HotFix).HotFixID 
+        PSVersion = $PSVersionTable        
+        LogicalDisks = (Get-WmiObject -Class Win32_LogicalDisk)        
         USBHistory = Get-ItemProperty HKLM:\SYSTEM\CurrentControlSet\Enum\USBSTOR\*\* -ErrorAction SilentlyContinue | select friendlyname, serial
         # Drivers = Get-WindowsDriver -online -all -ErrorAction SilentlyContinue
         ActiveUsers =  (Get-WmiObject Win32_LoggedOnUser -ComputerName $env:COMPUTERNAME).antecedent.name | Select-Object -Unique
-        NetworkInfo = Get-NetIPConfiguration
-        Route = Get-NetRoute
         ScheduledTasks = Get-ScheduledTask
         AntiVirus = (Get-WmiObject -Namespace "root\SecurityCenter2" -query "SELECT * FROM AntiVirusProduct").displayname
         SDCVersion = (Get-ItemProperty HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\OEMInformation).model
         InstalledPrograms =  Get-WmiObject -class win32_product | select Name,Version,InstallDate,InstallDate2,InstallLocation,InstallSource,Path,Vendor -ErrorAction SilentlyContinue
-               }
+               } # end of props
            #Takes out nulls from props
            $notnullarray = $props.GetEnumerator() | where value -ne $null
            $notnullhash = @{}
@@ -96,6 +89,32 @@ $BiosInfoList =         New-Object System.Collections.Generic.List[System.Object
    
     $InfoObject = New-Object -TypeName PSCustomObject -Property $notnullhash
     $InfoList.add($InfoObject)
+#------------------Networking Info-------------------------------#
+    $props = $null
+    $props = @{}
+    $props = @{
+        SMBShares = if (Get-Command Get-SmbShare) {
+                        Get-SmbShare
+                        } else {
+                        Get-WmiObject -Class win32_share
+                        }
+        NetworkInfo = Get-NetIPConfiguration
+        Domain = (Get-WmiObject -Class Win32_ComputerSystem).Domain
+        Route = Get-NetRoute
+        DNSCache = Get-DnsClientCache
+        NetAdapter = if (Get-Command Get-NetAdapter) {
+                        Get-NetAdapter
+                        } else {
+                        Get-WmiObject -Class win32_networkadapter
+                        }
+                } #end of props
+           #Takes out nulls from props
+           $notnullarray = $props.GetEnumerator() | where value -ne $null
+           $notnullhash = @{}
+           $notnullarray | foreach { $notnullhash[$_.Key] = $_.Value }
+   
+    $InfoObject = New-Object -TypeName PSCustomObject -Property $notnullhash
+    $NetworkList.add($InfoObject)
 
 #------------------Iterate Through Each Commandlet------------#
 
@@ -104,7 +123,7 @@ Foreach ($Service in Get-Service) {
         Name = $Service.ServiceName
         Status = $Service.Status
         StartType = $Service.StartType
-               }
+               } # end of props
            #Takes out nulls from props
            $notnullarray = $props.GetEnumerator() | where value -ne $null
            $notnullhash = @{}
@@ -128,7 +147,7 @@ Foreach ($Process in $getprocess) {
         Commandline = $Process.CommandLine
         ProcessHash = $Hash.hash
         HashAlgorithm = $Hash.Algorithm
-               } 
+               } # end of props
            #Takes out nulls $from props
            $notnullarray = $props.GetEnumerator() | where value -ne $null
            $notnullhash = @{}
@@ -261,7 +280,7 @@ $BiosInfo = Get-WmiObject -Class Win32_BIOS
         Manufacturer = $BiosInfo.Manufacturer
         SerialNumber = $BiosInfo.SerialNumber
         Version = $BiosInfo.Version
-               }
+               } #end of props
            #Takes out nulls from props
            $notnullarray = $props.GetEnumerator() | where value -ne $null
            $notnullhash = @{}
@@ -273,6 +292,7 @@ $BiosInfo = Get-WmiObject -Class Win32_BIOS
 $hostdata = New-Object -TypeName pscustomobject 
         $hostdata | Add-Member -Name HostKey -MemberType NoteProperty -Value $HostKeyList
         $hostdata | Add-Member -name ComputerInfo -MemberType NoteProperty -Value $InfoList
+        $hostdata | Add-Member -name NetworkInfo -MemberType NoteProperty -Value $NetworkList
         $hostdata | Add-Member -Name Services -MemberType NoteProperty -Value $ServiceList
         $hostdata | Add-Member -Name Processes -MemberType NoteProperty -Value $ProcessList
         $hostdata | Add-Member -Name Netstat -MemberType NoteProperty -Value $netstat
