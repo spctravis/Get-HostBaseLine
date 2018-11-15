@@ -1,0 +1,121 @@
+Function Get-WMIHostBaseLine
+{ 
+<# 
+.SYNOPSIS 
+    This function will bring back a single object of a number of host command-lets. 
+ 
+.DESCRIPTION 
+     This function gets processes, services, BIOs info, networking info, and basic computer info.  The function can run against local or remote machines. 
+ 
+.PARAMETER  Filepath 
+    Filepath of where to store the returned xml file
+ 
+.EXAMPLE 
+    PS C:\>$hostdata = Get-WMIHostBaseLine
+    PS C:\>$hostdata  
+         
+ComputerInfo : Netadaptor, Computername, etc
+Services : All services
+Processes  :  All Processes
+NetConnections : All Network Connections
+BIOsInfo : All BIOs Data
+    PS C:\>$hostdata.Processes.Name
+AGSService
+ApplicationFrameHost
+audiodg
+AuditManagerService
+Calculator
+                                     
+   
+.Notes 
+LastModified: 11/01/2018 
+Author:       Travis Anderson 
+Allow WMI Access:
+netsh firewall set service RemoteAdmin
+Netsh advfirewall set currentprofile settings remotemanagement enable             
+     
+#> 
+[CmdletBinding()]
+Param(
+    [Parameter(Mandatory=$True,ValueFromPipelineByPropertyName=$True)] 
+        [string]$filepath
+    )
+
+
+#------------------Set Each List to Null----------------------#
+
+$hostdata = $null
+
+#------------------Declare Each List--------------------------#
+$hostdata = New-Object -TypeName pscustomobject
+$hostdata | Add-Member -Name DateTimeStarted -Value (Get-Date).ToString("yyyyMMddThhmmssmsmsZ") -MemberType NoteProperty
+
+
+$CIMsessions = Get-CimSession
+if (!$CIMsessions) {Break}
+$CIMsessions | ForEach-Object {
+$Params = @{CIMSession = $_
+           }
+$computername = $_.computername
+#------------------Basic Computer Info------------------------#
+$args = @{ Namespace = 'root\subscription'  } #end args
+
+    $props = $null
+    $props = @{}    
+    $props = @{
+        
+        BaseInfo = Get-CimInstance @Params win32_computersystem
+        OperatingSystem = Get-CimInstance @Params -Class win32_OperatingSystem | ft caption,ServicePackMajorVersion     
+        Service = (Get-CimInstance @Params -class Win32_Service)
+        Process = Get-CimInstance @Params -class Win32_Process        
+        Dlls = Get-CimInstance @Params -class cim_processexecutable -Namespace root\cimv2
+        HotFix = (Get-CimInstance @Params -class Win32_QuickFixEngineering).HotFixID
+        PSBuildVersion = Get-CimInstance @Params cim_datafile -Filter "name='c:\\windows\\system32\\windowspowershell\\v1.0\\powershell.exe'" | select Version        
+        LogicalDisks = (Get-CimInstance @Params -Class Win32_LogicalDisk)        
+        smbShare = Get-CimInstance @Params -class Win32_Share
+        NetAdapters = Get-CimInstance @Params -class win32_NetworkAdapter        
+        ActiveUsers =  (Get-CimInstance @Params Win32_LoggedOnUser).antecedent.name | Select-Object -Unique
+        UserAccounts = Get-CimInstance @Params Win32_userAccount
+        LocalGroups = Get-CimInstance @Params Win32_Group
+        ScheduledTasks = Get-CimInstance @Params Win32_ScheduledJob       
+        AntiVirus1 = (Get-CimInstance @Params -Namespace "root\SecurityCenter" -query "SELECT * FROM AntiVirusProduct" -ErrorAction SilentlyContinue).displayname
+        AntiVirus2 = (Get-CimInstance @Params -Namespace "root\SecurityCenter2" -query "SELECT * FROM AntiVirusProduct" -ErrorAction SilentlyContinue).displayname      
+        Netstat = Get-NetTCPConnection @Params
+        Route = Get-CimInstance @Params win32_ip4routeTable
+        BioInfo = Get-CimInstance @Params -class Win32_BIOS
+        InstalledPrograms =  Get-CimInstance @Params -class win32_product | select Name,Version,InstallDate,InstallDate2,InstallLocation,InstallSource,Path,Vendor -ErrorAction SilentlyContinue
+        #WMI Persistence from Matt Graeber - Abusing WMI to build a persisten Asynchronous and fileless backdoor
+        WMIPersistenceCheckFiltertoConsumerBinding = Get-CimInstance @Params @args -Class __FilterToConsumerBinding
+        WMIPersistenceCheckEventFilter = Get-CimInstance @Params @args -Class __EventFilter
+        WMIPersistenceCheckEventConsumer = Get-CimInstance @Params @args -Class __EventConsumer
+        DateTimeFinshed  = (Get-Date).ToString("yyyyMMddThhmmssmsmsZ")        
+               } # end of props
+           #Takes out nulls from props
+           $notnullarray = $props.GetEnumerator() | where value -ne $null
+           $notnullhash = @{}
+           $notnullarray | foreach { $notnullhash[$_.Key] = $_.Value }
+   
+    $InfoObject = New-Object -TypeName PSCustomObject -Property $notnullhash
+    $InfoList = $null
+    $InfoList = New-Object System.Collections.Generic.List[System.Object]
+    $InfoList.add($InfoObject)
+
+#------------------Add Object Properties-----------------------#
+
+        $hostdata | Add-Member -Name $computername -MemberType NoteProperty -Value $InfoList
+ 
+} #End CIMSession foreach 
+if(!$filepath.EndsWith("\")) {
+$filepath+="\"  
+    }
+#$Path = Join-Path -ChildPath $filepath -Path ($hostdata).DateTimeStarted).xml
+ #Return $hostdata 
+ $ClixmlPath = $filepath + $hostdata.DateTimeStarted + '.xml'
+ try {
+ $hostdata | Export-Clixml -Path $ClixmlPath -Depth 4
+    }
+    catch
+    {
+        $PSCmdlet.ThrowTerminatingError($PSItem)
+    }
+} # End of Function Get-HostBaseLine
